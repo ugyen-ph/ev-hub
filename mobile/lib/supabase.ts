@@ -18,3 +18,4 @@ export const supabase = createClient(
   supabaseUrl ?? 'https://placeholder.supabase.co',
   supabasePublishableKey ?? 'placeholder-publishable-key'
 );
+
