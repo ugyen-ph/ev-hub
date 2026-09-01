@@ -69,3 +69,17 @@ Charger statuses are **demo (seed) data** today. The schema is built for the rea
 - `.env` files are **git-ignored**; only `.env.example` templates are committed
 - The Supabase `service_role` key is **server-side only** (admin dashboard), never shipped in the mobile app
 - Row Level Security policies make the database itself the bouncer — users can only touch their own data
+
+## Database — how to apply (Session 2)
+
+1. Create your local env file: `cd mobile` → `copy .env.example .env` → paste your Supabase **Project URL** and **anon key** (Dashboard → Project Settings → API)
+2. Open **Supabase Dashboard → SQL Editor** → for each file in order, paste the whole content and click **Run**:
+   1. `supabase/migrations/20260902000001_init_schema.sql`
+   2. `supabase/migrations/20260902000002_functions_triggers.sql`
+   3. `supabase/migrations/20260902000003_rls_policies.sql`
+   4. `supabase/seed.sql` (demo Bhutan stations)
+   5. `supabase/verify.sql` (sanity checks — run and eyeball the results)
+3. Fully restart Expo (stop + `npx expo start`) — Expo caches env vars at startup
+4. Open the **Stations** tab on your phone: 12 demo stations, live from your database
+
+All SQL is idempotent — re-running any file is safe.
