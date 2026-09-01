@@ -1,4 +1,5 @@
-import 'react-native-url-polyfill/auto';
+﻿import 'react-native-url-polyfill/auto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -14,5 +15,13 @@ if (!supabaseUrl || !supabaseKey) {
 // The publishable key is safe in the client: Row Level Security is the real gatekeeper.
 export const supabase = createClient(
   supabaseUrl ?? 'https://placeholder.supabase.co',
-  supabaseKey ?? 'placeholder-publishable-key'
+  supabaseKey ?? 'placeholder-publishable-key',
+  {
+    auth: {
+      storage: AsyncStorage, // keeps users signed in across app restarts
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  }
 );

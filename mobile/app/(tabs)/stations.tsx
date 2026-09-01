@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -21,6 +22,7 @@ export default function StationsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const tint = useThemeColor({}, 'tint');
+  const router = useRouter();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -28,13 +30,10 @@ export default function StationsScreen() {
     const { data, error: err } = await supabase.rpc('nearby_stations', {
       lat: DEMO_LOCATION.lat,
       lng: DEMO_LOCATION.lng,
-      radius_m: 300000, // whole country, from the demo location
+      radius_m: 300000,
     });
-    if (err) {
-      setError(err.message);
-    } else {
-      setStations((data as NearbyStation[]) ?? []);
-    }
+    if (err) setError(err.message);
+    else setStations((data as NearbyStation[]) ?? []);
     setLoading(false);
   }, []);
 
@@ -51,56 +50,45 @@ export default function StationsScreen() {
           <RefreshControl refreshing={loading} onRefresh={load} tintColor={tint} colors={[tint]} />
         }>
         <ThemedText type="title">Stations</ThemedText>
-        <ThemedText type="subtitle">Live from Supabase · {DEMO_LOCATION.label}</ThemedText>
+        <ThemedText type="subtitle">Live from the database · {DEMO_LOCATION.label}</ThemedText>
 
         {error ? (
           <ThemedView style={styles.errorCard}>
             <ThemedText type="defaultSemiBold">Could not load stations</ThemedText>
             <ThemedText style={styles.hint}>{error}</ThemedText>
-            <ThemedText style={styles.hint}>
-              Check mobile/.env (see README → Database) and pull to refresh.
-            </ThemedText>
           </ThemedView>
         ) : null}
 
         {!error && loading
-          ? [1, 2, 3].map((n) => (
-              <ThemedView key={n} style={[styles.card, styles.skeleton]} />
-            ))
+          ? [1, 2, 3].map((n) => <ThemedView key={n} style={[styles.card, styles.skeleton]} />)
           : null}
 
         {!error && !loading && stations.length === 0 ? (
           <ThemedView style={styles.errorCard}>
             <ThemedText type="defaultSemiBold">No stations found</ThemedText>
-            <ThemedText style={styles.hint}>
-              Did you apply the migrations and seed? See README → Database.
-            </ThemedText>
+            <ThemedText style={styles.hint}>Apply the SQL files (see README → Database).</ThemedText>
           </ThemedView>
         ) : null}
 
         {stations.map((s) => {
           const a = availability(s.total_chargers, s.available_chargers);
           return (
-            <ThemedView key={s.id} style={styles.card}>
-              <View style={[styles.dot, { backgroundColor: a.color }]} />
-              <View style={styles.info}>
-                <ThemedText type="defaultSemiBold">{s.name}</ThemedText>
-                <ThemedText style={styles.meta}>
-                  {s.district} · {km(s.distance_m)} · {s.available_chargers}/{s.total_chargers} free
-                </ThemedText>
-              </View>
-              <ThemedText style={[styles.status, { color: a.color }]}>{a.label}</ThemedText>
-            </ThemedView>
+            <Pressable key={s.id} onPress={() => router.push(`/station/${s.id}` as never)}>
+              <ThemedView style={styles.card}>
+                <View style={[styles.dot, { backgroundColor: a.color }]} />
+                <View style={styles.info}>
+                  <ThemedText type="defaultSemiBold">{s.name}</ThemedText>
+                  <ThemedText style={styles.meta}>
+                    {s.district} · {km(s.distance_m)} · {s.available_chargers}/{s.total_chargers} free
+                  </ThemedText>
+                </View>
+                <ThemedText style={[styles.status, { color: a.color }]}>{a.label}</ThemedText>
+              </ThemedView>
+            </Pressable>
           );
         })}
 
-        <Pressable style={[styles.retry, { backgroundColor: tint }]} onPress={load}>
-          <ThemedText style={styles.retryText}>↻ Refresh</ThemedText>
-        </Pressable>
-
-        <ThemedText style={styles.footer}>
-          Real database · demo seed data · GPS pins arrive in Session 4
-        </ThemedText>
+        <ThemedText style={styles.footer}>Tap a station to book a charger ⚡</ThemedText>
       </ScrollView>
     </ThemedView>
   );
@@ -131,13 +119,5 @@ const styles = StyleSheet.create({
   meta: { opacity: 0.6, fontSize: 12 },
   status: { fontSize: 12, fontWeight: '600' },
   hint: { opacity: 0.6, fontSize: 12 },
-  retry: {
-    alignSelf: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 999,
-    marginTop: 4,
-  },
-  retryText: { color: '#FFFFFF', fontWeight: '600' },
-  footer: { opacity: 0.6, fontSize: 12, textAlign: 'center', marginTop: 4 },
+  footer: { opacity: 0.6, fontSize: 12, textAlign: 'center', marginTop: 8 },
 });
