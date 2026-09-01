@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# secrets — never commit (.env.example templates ARE committed)
+.env
+.env.*
+!.env.example
+*.pem
+*.jks
+*.keystore
+
+# builds & caches
+.next/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# logs
+*.log
+npm-debug.*
+
+# OS noise
+.DS_Store
+Thumbs.db

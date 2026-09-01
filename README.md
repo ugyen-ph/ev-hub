@@ -1,0 +1,71 @@
+# ⚡ EV Hub — Bhutan's EV Charging Network
+
+Find, reserve and navigate to EV charging stations across Bhutan — with a live admin dashboard for station operators.
+
+> **Status:** Session 1 complete — monorepo scaffold, branding, and app shell running.
+
+## Products (one repo, three parts)
+
+| Folder | Product | Stack |
+|---|---|---|
+| `mobile/` | Driver app: map, live charger status, reservations, navigation | React Native · Expo SDK 54 · TypeScript |
+| `admin/` | Operator dashboard: live monitor, station & charger management, analytics | Next.js · Tailwind CSS · TypeScript |
+| `supabase/` | Shared backend: schema migrations & seed data | PostgreSQL · PostGIS · Auth · Realtime |
+
+## Architecture
+
+```
+┌─────────────────────┐         ┌──────────────────────────┐
+│  📱 MOBILE APP       │         │  🖥️ ADMIN DASHBOARD       │
+│  find · reserve ·   │         │  monitor · manage ·      │
+│  navigate           │         │  analytics               │
+└──────────┬──────────┘         └────────────┬─────────────┘
+           │  same anon key, RLS-scoped       │
+           └──────────► SUPABASE ◄───────────┘
+                PostgreSQL+PostGIS · Auth · Realtime
+                            ▲
+        Phase 2 (BPC): OCPP gateway writes charger
+        status & sessions into the same tables
+```
+
+## Getting started
+
+**Prerequisites:** Node.js LTS, Expo Go on your phone, a free Supabase project.
+
+```bash
+# Mobile app
+cd mobile
+npm install
+copy .env.example .env        # paste your Supabase URL + anon key
+npx expo start                # scan the QR code with Expo Go
+
+# Admin dashboard
+cd admin
+npm install
+copy .env.example .env.local  # paste Supabase keys (service_role stays here)
+npm run dev                   # http://localhost:3000
+```
+
+## Roadmap
+
+- [x] **Session 1** — monorepo scaffold, EV Hub branding, mobile tab shell, admin shell
+- [ ] **Session 2** — Supabase schema (OCPP-ready) + RLS policies + demo Bhutan stations
+- [ ] **Session 3** — Auth (email sign-in) + EV profiles
+- [ ] **Session 4** — Map, nearest stations, live status via Realtime
+- [ ] **Session 5** — Reservations with database-level double-booking protection
+- [ ] **Session 6** — Admin Live Monitor + station/charger management
+- [ ] **Session 7** — OSRM routing, demo-mode fallback, showcase polish
+
+## Demo data & the BPC integration path
+
+Charger statuses are **demo (seed) data** today. The schema is built for the real thing:
+
+- `status_source` (`seed` | `manual` | `ocpp`) tracks where status truth comes from — OCPP always wins
+- `charging_sessions` mirrors OCPP's transaction model (meter start/stop kWh)
+- Phase 2 adds a small Node.js **OCPP gateway** that writes into the same tables — zero changes to the app or dashboard when BPC chargers connect
+
+## Security
+
+- `.env` files are **git-ignored**; only `.env.example` templates are committed
+- The Supabase `service_role` key is **server-side only** (admin dashboard), never shipped in the mobile app
+- Row Level Security policies make the database itself the bouncer — users can only touch their own data
