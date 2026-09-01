@@ -69,6 +69,7 @@ Charger statuses are **demo (seed) data** today. The schema is built for the rea
 - `.env` files are **git-ignored**; only `.env.example` templates are committed
 - The Supabase `service_role` key is **server-side only** (admin dashboard), never shipped in the mobile app
 - Row Level Security policies make the database itself the bouncer — users can only touch their own data
+- Demo concession: migration `0005` lets the dashboard flip charger status **without** a secret key. Safety rails: only the `status` + `status_source` columns are writable, only `seed`/`manual` rows can be touched, `ocpp` rows (real hardware) are untouchable, and signed-in mobile users are not covered. **Before production:** drop the `chargers_demo_flip` policy (statements at the bottom of the migration file)
 
 ## Database — how to apply (Session 2)
 
@@ -79,6 +80,8 @@ Charger statuses are **demo (seed) data** today. The schema is built for the rea
    3. `supabase/migrations/20260902000003_rls_policies.sql`
    4. `supabase/seed.sql` (demo Bhutan stations)
    5. `supabase/verify.sql` (sanity checks — run and eyeball the results)
+   6. `supabase/migrations/20260902000004_stations_map_view.sql` (map pins for the mobile Map tab)
+   7. `supabase/migrations/20260902000005_demo_status_flip.sql` (optional, demo-only — dashboard status buttons work without a secret key)
 3. Fully restart Expo (stop + `npx expo start`) — Expo caches env vars at startup
 4. Open the **Stations** tab on your phone: 12 demo stations, live from your database
 
