@@ -31,6 +31,7 @@ export default function Home() {
   const [rows, setRows] = useState<ChargerRow[]>([]);
   const [envError, setEnvError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -65,13 +66,23 @@ export default function Home() {
 
   async function setStatus(chargerId: string, status: Status) {
     setPending(chargerId);
-    await fetch('/api/status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chargerId, status }),
-    });
-    setPending(null);
-    load();
+    setActionError(null);
+    try {
+      const res = await fetch('/api/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chargerId, status }),
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+        setActionError(payload?.error ?? `Status flip failed (HTTP ${res.status})`);
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setPending(null);
+      load();
+    }
   }
 
   const stats = Object.fromEntries(
@@ -94,6 +105,12 @@ export default function Home() {
         {envError ? (
           <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
             {envError}
+          </div>
+        ) : null}
+
+        {actionError ? (
+          <div className="mb-6 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-300">
+            ⚠️ {actionError}
           </div>
         ) : null}
 
