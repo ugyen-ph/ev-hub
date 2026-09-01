@@ -72,7 +72,7 @@ Charger statuses are **demo (seed) data** today. The schema is built for the rea
 
 ## Database — how to apply (Session 2)
 
-1. Create your local env file: `cd mobile` → `copy .env.example .env` → paste your Supabase **Project URL** and **anon key** (Dashboard → Project Settings → API)
+1. Create your local env file: `cd mobile` → `copy .env.example .env` → paste your Supabase **Project URL** and **publishable key** (Dashboard → Project Settings → API)
 2. Open **Supabase Dashboard → SQL Editor** → for each file in order, paste the whole content and click **Run**:
    1. `supabase/migrations/20260902000001_init_schema.sql`
    2. `supabase/migrations/20260902000002_functions_triggers.sql`
