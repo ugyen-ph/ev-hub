@@ -12,10 +12,13 @@ import { FlipButtons } from '@/components/flip-buttons';
 import { StatusBadge } from '@/components/status-badge';
 import { StationForm, type StationFormValues } from '@/components/station-form';
 import { getSupabase } from '@/lib/supabase';
-import { CONNECTOR_TYPES, type Charger, type ConnectorType, type Station } from '@/lib/types';
-
-// PostgREST returns geography as GeoJSON: { type: 'Point', coordinates: [lng, lat] }
-type GeoPoint = { type: 'Point'; coordinates: [number, number] } | null;
+import {
+  CONNECTOR_TYPES,
+  parseStationLocation,
+  type Charger,
+  type ConnectorType,
+  type Station,
+} from '@/lib/types';
 
 const INPUT =
   'w-full rounded-lg border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-emerald-500';
@@ -178,10 +181,9 @@ export default function StationDetailPage() {
     );
   }
 
-  const loc = (station as unknown as { location: GeoPoint }).location;
-  const initialLatLng = loc
-    ? { lat: String(loc.coordinates[1]), lng: String(loc.coordinates[0]) }
-    : null;
+  // PostgREST returns geography(point) as WKT text ('POINT(lng lat)') — parse
+  // it (GeoJSON shape handled too) to prefill the form's lat/lng fields.
+  const initialLatLng = parseStationLocation(station.location);
   const free = chargers.filter((c) => c.status === 'available').length;
 
   return (

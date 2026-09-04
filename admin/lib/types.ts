@@ -15,6 +15,8 @@ export type Station = {
   address: string | null;
   amenities: string[];
   is_active: boolean;
+  /** geography(point,4326) — PostgREST returns it as WKT text: 'POINT(lng lat)'. */
+  location: unknown;
   created_at: string;
   updated_at: string;
 };
@@ -74,3 +76,22 @@ export type ReservationWithRelations = Reservation & {
 export const CHARGER_STATUSES: ChargerStatus[] = ['available', 'reserved', 'busy', 'faulted', 'offline'];
 export const CONNECTOR_TYPES: ConnectorType[] = ['type2', 'ccs2', 'chademo'];
 export const RESERVATION_STATUSES: ReservationStatus[] = ['confirmed', 'active', 'completed', 'cancelled', 'expired'];
+
+// ---- geography helper ----
+
+// PostgREST returns geography(point,4326) columns as WKT text ('POINT(lng lat)').
+// parseStationLocation also accepts the GeoJSON object shape defensively.
+export function parseStationLocation(
+  location: unknown,
+): { lat: string; lng: string } | null {
+  if (typeof location === 'string') {
+    const m = location.match(/POINT\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)/i);
+    if (m) return { lng: m[1], lat: m[2] };
+  } else if (location && typeof location === 'object') {
+    const coords = (location as { coordinates?: unknown }).coordinates;
+    if (Array.isArray(coords) && coords.length >= 2) {
+      return { lng: String(coords[0]), lat: String(coords[1]) };
+    }
+  }
+  return null;
+}
