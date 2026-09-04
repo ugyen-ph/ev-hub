@@ -25,8 +25,10 @@ const STEP_MS = 120;
 const T0 = Date.now();
 
 /** hex (#RGB / #RRGGBB) + alpha -> rgba(); unparsable colours stay invisible. */
-function withAlpha(hex: string, alpha: number): string {
-  const m = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
+function withAlpha(hex: string | undefined, alpha: number): string {
+  // NOTE: group 1 must be CAPTURING — a (?:…) group would leave m[1]
+  // undefined and crash on the .length below for every valid colour.
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec((hex ?? '').trim());
   if (!m) return 'rgba(0, 0, 0, 0)';
   let h = m[1];
   if (h.length === 3) h = [...h].map((c) => c + c).join('');
