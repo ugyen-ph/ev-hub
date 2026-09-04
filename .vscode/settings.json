@@ -1,0 +1,7 @@
+{
+  // Use the project's own TypeScript (mobile: ~6.0.3) instead of VS Code's
+  // bundled version, so editor diagnostics always match `npx tsc --noEmit`.
+  // VS Code will prompt once ("Allow") after reloading the window.
+  "typescript.tsdk": "mobile/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
