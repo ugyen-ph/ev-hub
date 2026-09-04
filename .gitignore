@@ -16,6 +16,9 @@ dist/
 web-build/
 *.tsbuildinfo
 
+# local sandbox / practice work (has its own embedded .git)
+practical_ll/
+
 # logs
 *.log
 npm-debug.*
