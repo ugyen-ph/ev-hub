@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { useRealtimeStations } from '@/hooks/use-realtime-chargers';
 import { supabase } from '@/lib/supabase';
 import { DEMO_LOCATION, type NearbyStation } from '@/lib/types';
 import { StatusColors } from '@/constants/theme';
@@ -18,28 +19,25 @@ function availability(total: number, available: number) {
 const km = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
 
 export default function StationsScreen() {
-  const [stations, setStations] = useState<NearbyStation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use real-time hook for automatic updates when charger statuses change
+  const { stations, loading, error } = useRealtimeStations();
   const tint = useThemeColor({}, 'tint');
   const router = useRouter();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const { data, error: err } = await supabase.rpc('nearby_stations', {
+  // Manual refresh function for pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    // The real-time hook handles automatic updates,
+    // but we keep this for manual refresh capability
+    const { error: err } = await supabase.rpc('nearby_stations', {
       lat: DEMO_LOCATION.lat,
       lng: DEMO_LOCATION.lng,
       radius_m: 300000,
     });
-    if (err) setError(err.message);
-    else setStations((data as NearbyStation[]) ?? []);
-    setLoading(false);
+    if (err) console.error('Refresh error:', err.message);
+    setRefreshing(false);
   }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   return (
     <ThemedView style={styles.container}>
@@ -47,10 +45,10 @@ export default function StationsScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={load} tintColor={tint} colors={[tint]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tint} colors={[tint]} />
         }>
         <ThemedText type="title">Stations</ThemedText>
-        <ThemedText type="subtitle">Live from the database · {DEMO_LOCATION.label}</ThemedText>
+        <ThemedText type="subtitle">Live from the database Â· {DEMO_LOCATION.label}</ThemedText>
 
         {error ? (
           <ThemedView style={styles.errorCard}>
@@ -66,7 +64,7 @@ export default function StationsScreen() {
         {!error && !loading && stations.length === 0 ? (
           <ThemedView style={styles.errorCard}>
             <ThemedText type="defaultSemiBold">No stations found</ThemedText>
-            <ThemedText style={styles.hint}>Apply the SQL files (see README → Database).</ThemedText>
+            <ThemedText style={styles.hint}>Apply the SQL files (see README â†’ Database).</ThemedText>
           </ThemedView>
         ) : null}
 
@@ -79,7 +77,7 @@ export default function StationsScreen() {
                 <View style={styles.info}>
                   <ThemedText type="defaultSemiBold">{s.name}</ThemedText>
                   <ThemedText style={styles.meta}>
-                    {s.district} · {km(s.distance_m)} · {s.available_chargers}/{s.total_chargers} free
+                    {s.district} Â· {km(s.distance_m)} Â· {s.available_chargers}/{s.total_chargers} free
                   </ThemedText>
                 </View>
                 <ThemedText style={[styles.status, { color: a.color }]}>{a.label}</ThemedText>
@@ -88,7 +86,7 @@ export default function StationsScreen() {
           );
         })}
 
-        <ThemedText style={styles.footer}>Tap a station to book a charger ⚡</ThemedText>
+        <ThemedText style={styles.footer}>Tap a station to book a charger âš¡</ThemedText>
       </ScrollView>
     </ThemedView>
   );

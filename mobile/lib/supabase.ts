@@ -23,10 +23,16 @@ export const supabase = createClient(
       persistSession: false,
       detectSessionInUrl: false,
     },
+    realtime: {
+      // Explicit real-time config for React Native
+      params: {
+        eventsPerSecond: 10,
+      },
+    },
   }
 );
 
 // React Native has no browser visibility events, so supabase-js never starts its
-// background refresh ticker by itself — start it explicitly. The ticker refreshes
+// background refresh ticker by itself - start it explicitly. The ticker refreshes
 // the in-memory access token before it expires (default JWT lifetime is 1 hour).
 void supabase.auth.startAutoRefresh();

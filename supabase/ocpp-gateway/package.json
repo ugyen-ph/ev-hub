@@ -1,0 +1,18 @@
+{
+  "name": "evhub-ocpp-gateway",
+  "version": "1.0.0",
+  "description": "OCPP 1.6 Gateway for EV Hub Bhutan - Connects BPC chargers to Supabase",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/fake-charger.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5"
+  },
+  "keywords": ["ocpp", "ev-charging", "bhutan"],
+  "author": "EV Hub Bhutan",
+  "license": "MIT"
+}
