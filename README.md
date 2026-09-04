@@ -2,7 +2,7 @@
 
 Find, reserve and navigate to EV charging stations across Bhutan — with a live admin dashboard for station operators.
 
-> **Status:** Session 1 complete — monorepo scaffold, branding, and app shell running.
+> **Status:** Sessions 1–6 complete — app + shared backend + operator dashboard running.
 
 ## Products (one repo, three parts)
 
@@ -42,18 +42,22 @@ npx expo start                # scan the QR code with Expo Go
 # Admin dashboard
 cd admin
 npm install
-copy .env.example .env.local  # paste Supabase keys (service_role stays here)
-npm run dev                   # http://localhost:3000
+copy .env.example .env        # paste your Supabase URL + publishable key
+npm run dev                   # http://localhost:3000 — sign in with an operator account
+
+# First operator (one-time): sign up in the mobile app, then in Supabase →
+# SQL Editor run the bootstrap snippet at the bottom of migration 0006
+# (sets profiles.role = 'admin' for your email).
 ```
 
 ## Roadmap
 
 - [x] **Session 1** — monorepo scaffold, EV Hub branding, mobile tab shell, admin shell
-- [ ] **Session 2** — Supabase schema (OCPP-ready) + RLS policies + demo Bhutan stations
-- [ ] **Session 3** — Auth (email sign-in) + EV profiles
-- [ ] **Session 4** — Map, nearest stations, live status via Realtime
-- [ ] **Session 5** — Reservations with database-level double-booking protection
-- [ ] **Session 6** — Admin Live Monitor + station/charger management
+- [x] **Session 2** — Supabase schema (OCPP-ready) + RLS policies + demo Bhutan stations
+- [x] **Session 3** — Auth (email sign-in) + EV profiles
+- [x] **Session 4** — Map, nearest stations, live status via Realtime
+- [x] **Session 5** — Reservations with database-level double-booking protection
+- [x] **Session 6** — Admin dashboard: Stations · Users (live signups) · Reservations · Analytics
 - [ ] **Session 7** — OSRM routing, demo-mode fallback, showcase polish
 
 ## Demo data & the BPC integration path
@@ -67,9 +71,10 @@ Charger statuses are **demo (seed) data** today. The schema is built for the rea
 ## Security
 
 - `.env` files are **git-ignored**; only `.env.example` templates are committed
-- The Supabase `service_role` key is **server-side only** (admin dashboard), never shipped in the mobile app
+- The dashboard writes through the **signed-in operator's own token** — Row Level Security (`is_admin()`) is the gatekeeper; no secret key is used client-side
+- The old demo status-flip policy from migration `0005` is **no longer used** by the dashboard — close it before production (the `drop`/`revoke` statements at the bottom of that file)
+- Migration `0006` hardens the database: clients can no longer set `profiles.role` (privilege-escalation fix), `expire_stale_reservations()` is authenticated-only, and `profiles` + `stations` are published to Realtime so the Users/Stations dashboards update live (Realtime respects RLS — only admins receive other users' rows)
 - Row Level Security policies make the database itself the bouncer — users can only touch their own data
-- Demo concession: migration `0005` lets the dashboard flip charger status **without** a secret key. Safety rails: only the `status` + `status_source` columns are writable, only `seed`/`manual` rows can be touched, `ocpp` rows (real hardware) are untouchable, and signed-in mobile users are not covered. **Before production:** drop the `chargers_demo_flip` policy (statements at the bottom of the migration file)
 
 ## Database — how to apply (Session 2)
 
@@ -81,7 +86,8 @@ Charger statuses are **demo (seed) data** today. The schema is built for the rea
    4. `supabase/seed.sql` (demo Bhutan stations)
    5. `supabase/verify.sql` (sanity checks — run and eyeball the results)
    6. `supabase/migrations/20260902000004_stations_map_view.sql` (map pins for the mobile Map tab)
-   7. `supabase/migrations/20260902000005_demo_status_flip.sql` (optional, demo-only — dashboard status buttons work without a secret key)
+   7. `supabase/migrations/20260902000005_demo_status_flip.sql` (optional, demo-only — status flips without a secret key; no longer used by the dashboard)
+   8. `supabase/migrations/20260902000006_admin_realtime_and_hardening.sql` (required for the admin dashboard — realtime for profiles/stations + security hardening; includes the first-operator bootstrap snippet)
 3. Fully restart Expo (stop + `npx expo start`) — Expo caches env vars at startup
 4. Open the **Stations** tab on your phone: 12 demo stations, live from your database
 

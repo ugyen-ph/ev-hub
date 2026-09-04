@@ -1,5 +1,4 @@
-﻿import 'react-native-url-polyfill/auto';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -18,10 +17,16 @@ export const supabase = createClient(
   supabaseKey ?? 'placeholder-publishable-key',
   {
     auth: {
-      storage: AsyncStorage, // keeps users signed in across app restarts
+      // Sessions live in memory only: every app launch / QR scan starts at the
+      // login screen, and signing in opens the app via the gate in app/_layout.tsx.
       autoRefreshToken: true,
-      persistSession: true,
+      persistSession: false,
       detectSessionInUrl: false,
     },
   }
 );
+
+// React Native has no browser visibility events, so supabase-js never starts its
+// background refresh ticker by itself — start it explicitly. The ticker refreshes
+// the in-memory access token before it expires (default JWT lifetime is 1 hour).
+void supabase.auth.startAutoRefresh();

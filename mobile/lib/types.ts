@@ -1,4 +1,4 @@
-// Shared types + demo location (GPS arrives in a later phase)
+// Shared types + the demo-location GPS fallback (real GPS comes from expo-location at runtime).
 
 export type NearbyStation = {
   id: string;
@@ -51,7 +51,7 @@ export type ProfileRow = {
   role: 'user' | 'admin';
 };
 
-/** Thimphu city centre — the "Demo Location" fallback for showcases & testing. */
+/** Thimphu city centre — fallback when GPS is denied/unavailable (map locate button). */
 export const DEMO_LOCATION = {
   lat: 27.4728,
   lng: 89.639,

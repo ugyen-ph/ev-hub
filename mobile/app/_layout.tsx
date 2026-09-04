@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { Colors, Brand } from '@/constants/theme';
+import { AuthProvider, useAuth } from '@/context/auth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const EvHubLight: Theme = {
@@ -34,15 +35,41 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+/**
+ * Auth gate (Protected routes — Expo Router v6):
+ *  - while auth state is checked on launch, render nothing → the splash screen
+ *    stays up and nothing flashes;
+ *  - signed in  → only the (tabs) group exists;
+ *  - signed out → only the (auth) group exists (login / sign-up).
+ * Flipping the guard mid-session (sign-in / sign-out) redirects automatically,
+ * and deep links into protected screens bounce to the available group.
+ */
+function RootNavigator() {
+  const { session, initializing } = useAuth();
+
+  if (initializing) return null;
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={Boolean(session)}>
+        <Stack.Screen name="(tabs)" />
+      </Stack.Protected>
+      <Stack.Protected guard={!session}>
+        <Stack.Screen name="(auth)" />
+      </Stack.Protected>
+    </Stack>
+  );
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? EvHubDark : EvHubLight}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? EvHubDark : EvHubLight}>
+        <RootNavigator />
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </AuthProvider>
   );
 }

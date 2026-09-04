@@ -40,6 +40,12 @@
             "backgroundColor": "#0C1512"
           }
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow EV Hub to use your location to find the nearest charging station."
+        }
       ]
     ],
     "experiments": {

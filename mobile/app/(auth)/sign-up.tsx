@@ -1,0 +1,170 @@
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import { Link } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { supabase } from '@/lib/supabase';
+
+export default function SignUpScreen() {
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const tint = useThemeColor({}, 'tint');
+  const insets = useSafeAreaInsets();
+
+  const signUp = async () => {
+    setNotice(null);
+    if (!fullName.trim()) {
+      setError('Tell us your name.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    const { data, error: err } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      // The profiles trigger reads full_name from the user metadata.
+      options: { data: { full_name: fullName.trim() } },
+    });
+    setBusy(false);
+
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    if (!data.session) {
+      // Email confirmation is ON: no session yet — ask them to confirm first.
+      setNotice('Account created 🎉 Check your inbox to confirm your email, then sign in.');
+    }
+    // If a session came back, the auth gate in app/_layout.tsx swaps to the app.
+  };
+
+  return (
+    <ThemedView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingTop: insets.top + 48, paddingBottom: insets.bottom + 32 },
+          ]}
+          keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <ThemedText type="title">⚡ EV Hub</ThemedText>
+            <ThemedText style={styles.tagline}>
+              Create an account to reserve chargers.
+            </ThemedText>
+          </View>
+
+          <ThemedView style={styles.card}>
+            <ThemedText type="subtitle">Create your account</ThemedText>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Full name"
+              placeholderTextColor="#888"
+              value={fullName}
+              onChangeText={setFullName}
+              autoCapitalize="words"
+              autoComplete="name"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor="#888"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password (6+ characters)"
+              placeholderTextColor="#888"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoComplete="new-password"
+            />
+
+            {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
+            {notice ? <ThemedText style={styles.notice}>{notice}</ThemedText> : null}
+
+            <Pressable
+              style={[styles.btn, { backgroundColor: tint }, busy && styles.busy]}
+              disabled={busy}
+              onPress={() => void signUp()}>
+              {busy ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <ThemedText style={styles.btnText}>Create account</ThemedText>
+              )}
+            </Pressable>
+
+            <Link href="/(auth)/login" style={styles.switchLink}>
+              <ThemedText style={[styles.switchText, { color: tint }]}>
+                Already have an account? Sign in
+              </ThemedText>
+            </Link>
+          </ThemedView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  flex: { flex: 1 },
+  scroll: { paddingHorizontal: 24 },
+  header: { gap: 8, marginBottom: 24 },
+  tagline: { opacity: 0.65, fontSize: 15 },
+  card: {
+    gap: 10,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(14,159,110,0.25)',
+  },
+  input: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(120,120,120,0.4)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  error: { fontSize: 13, color: '#DC2626' },
+  notice: { fontSize: 13, opacity: 0.75 },
+  btn: { paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginTop: 4 },
+  busy: { opacity: 0.6 },
+  btnText: { color: '#FFFFFF', fontWeight: '700' },
+  switchLink: { alignSelf: 'center', marginTop: 4 },
+  switchText: { fontSize: 13, fontWeight: '600' },
+});
