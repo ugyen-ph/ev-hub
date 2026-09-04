@@ -46,7 +46,11 @@
         {
           "locationWhenInUsePermission": "Allow EV Hub to use your location to find the nearest charging station."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

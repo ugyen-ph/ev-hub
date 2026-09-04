@@ -268,7 +268,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   glowLayer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'visible',
