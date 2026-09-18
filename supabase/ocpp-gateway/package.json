@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/fake-charger.js"
+    "test": "node test/fake-charger.js",
+    "verify": "node test/verify-results.js",
+    "verify:idtag": "node test/idtag-check.js"
   },
   "dependencies": {
     "ws": "^8.18.0",

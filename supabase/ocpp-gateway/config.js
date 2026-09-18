@@ -4,6 +4,8 @@
 
 require('dotenv').config();
 
+const fs = require('fs');
+
 const config = {
   // Supabase connection
   supabase: {
@@ -15,6 +17,11 @@ const config = {
   gateway: {
     port: parseInt(process.env.GATEWAY_PORT) || 8080,
     host: '0.0.0.0',
+    // Optional TLS termination (wss://). When both are set the gateway
+    // serves https+wss itself; otherwise run it behind a reverse proxy
+    // (nginx/caddy) and point chargers at wss://your-domain/ocpp.
+    tlsKeyPath: process.env.TLS_KEY_PATH || null,
+    tlsCertPath: process.env.TLS_CERT_PATH || null,
   },
 
   // OCPP protocol settings
@@ -23,7 +30,20 @@ const config = {
     heartbeatInterval: parseInt(process.env.HEARTBEAT_INTERVAL) || 60,
   },
 
-  // Charger authentication (charge_point_id -> password)
+  // Offline watchdog: chargers whose last heartbeat is older than this are
+  // marked 'offline' (status_source = 'ocpp' rows only). Real chargers
+  // heartbeat every ~60s by default, so 10 minutes means 10 missed beats.
+  offline: {
+    afterMinutes: parseFloat(process.env.OFFLINE_AFTER_MINUTES) || 10,
+    sweepSeconds: parseInt(process.env.OFFLINE_SWEEP_SECONDS) || 60,
+  },
+
+  // Fallback price (NU/kWh) when a station has no tariff configured.
+  tariffFallbackNu: parseFloat(process.env.TARIFF_FALLBACK_NU) || 5,
+
+  // Charger authentication (charge_point_id -> password).
+  // OCPP 1.6J security profile 1: HTTP Basic auth on the WebSocket upgrade,
+  // username = charge point identity. In demo mode auth is skipped.
   chargers: parseChargerConfig(process.env.CHARGERS),
 
   // Demo mode (no real chargers needed)
@@ -64,6 +84,19 @@ function validateConfig() {
 
   if (!config.supabase.serviceKey) {
     errors.push('SUPABASE_SERVICE_KEY is required');
+  }
+
+  if (!config.demoMode && Object.keys(config.chargers).length === 0) {
+    errors.push('DEMO_MODE is false but CHARGERS is empty — add "id:password" pairs');
+  }
+
+  // TLS is opt-in: either both paths or neither
+  if (Boolean(config.gateway.tlsKeyPath) !== Boolean(config.gateway.tlsCertPath)) {
+    errors.push('TLS_KEY_PATH and TLS_CERT_PATH must be set together (or neither)');
+  } else if (config.gateway.tlsKeyPath && !fs.existsSync(config.gateway.tlsKeyPath)) {
+    errors.push(`TLS key not found: ${config.gateway.tlsKeyPath}`);
+  } else if (config.gateway.tlsCertPath && !fs.existsSync(config.gateway.tlsCertPath)) {
+    errors.push(`TLS certificate not found: ${config.gateway.tlsCertPath}`);
   }
 
   if (errors.length > 0) {

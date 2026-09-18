@@ -70,22 +70,22 @@ ws.on('open', async () => {
   sendOcpp('StartTransaction', {
     connectorId: 1,
     idTag: 'USER-001',
-    meterStart: 50.0,
+    meterStart: 50000, // OCPP 1.6: Wh (50.000 kWh)
     timestamp: new Date().toISOString(),
   });
 
   await sleep(3000);
 
-  // Step 6: MeterValues (periodic readings)
+  // Step 6: MeterValues (periodic readings, in Wh — the OCPP 1.6 default)
   console.log('\n--- Step 6: Meter Values ---');
-  const readings = [52.3, 55.7, 60.2, 65.8, 70.1];
+  const readings = [52300, 55700, 60200, 65800, 70100]; // Wh
   for (const reading of readings) {
     sendOcpp('MeterValues', {
       connectorId: 1,
       transactionId: null,
       meterValue: [{
         timestamp: new Date().toISOString(),
-        sampledValue: [{ value: reading.toString(), unit: 'kWh' }],
+        sampledValue: [{ value: reading.toString() }], // no unit → default Wh
       }],
     });
     await sleep(2000);
@@ -105,7 +105,7 @@ ws.on('open', async () => {
   console.log('\n--- Step 8: Stop Charging ---');
   sendOcpp('StopTransaction', {
     transactionId: null,
-    meterStop: 75.5,
+    meterStop: 75500, // Wh (75.500 kWh) → session delivered 25.500 kWh
     timestamp: new Date().toISOString(),
     idTag: 'USER-001',
   });

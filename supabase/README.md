@@ -9,4 +9,5 @@ Single source of truth shared by the mobile app and the admin dashboard.
 ## Conventions
 - Every table enables **RLS** with its policies written in the same migration file — self-contained and portable
 - `status_source` (`seed` | `manual` | `ocpp`) records where a charger's status truth comes from; **OCPP always wins** over manual edits
-- `charging_sessions` is built to OCPP's transaction model (meter start/stop kWh) so the Phase 2 OCPP gateway is a pure add-on — no app or dashboard changes
+- `charging_sessions` mirrors OCPP's transaction model — the **gateway converts OCPP's Wh readings to kWh** before writing; `ocpp_transaction_id` is unique and DB-generated (0007); cost = (stop − start) × `stations.tariff_nu_per_kwh`
+- Drivers have an OCPP identity on `profiles.id_tag` (0007) — the gateway links sessions to users and auto-checks-in matching reservations

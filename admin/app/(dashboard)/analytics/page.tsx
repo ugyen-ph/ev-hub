@@ -1,14 +1,21 @@
 'use client';
 
 // Dashboard 4 — Analytics for the station network, computed client-side from
-// the four tables (stations, chargers, reservations, profiles). Energy/kWh
-// analytics activate in Phase 2 when the OCPP gateway fills charging_sessions.
+// the five tables (stations, chargers, reservations, profiles and — since the
+// OCPP gateway went live — charging_sessions).
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { BarChart, Donut, HBars } from '@/components/charts';
 import { getSupabase } from '@/lib/supabase';
-import { CHARGER_STATUSES, type Charger, type Profile, type Reservation, type Station } from '@/lib/types';
+import {
+  CHARGER_STATUSES,
+  type Charger,
+  type ChargingSession,
+  type Profile,
+  type Reservation,
+  type Station,
+} from '@/lib/types';
 
 const DAY = 86_400_000;
 const WEEK = 7 * DAY;
@@ -28,6 +35,7 @@ export default function AnalyticsPage() {
   const [chargers, setChargers] = useState<Charger[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [sessions, setSessions] = useState<ChargingSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   // "Now" is captured after mount (deferred) — keeps the render pure for the
@@ -42,7 +50,7 @@ export default function AnalyticsPage() {
   const load = useCallback(async () => {
     const supabase = getSupabase();
     if (!supabase) return; // env problems are surfaced by the dashboard shell
-    const [st, ch, res, prof] = await Promise.all([
+    const [st, ch, res, prof, ses] = await Promise.all([
       supabase.from('stations').select('*'),
       supabase.from('chargers').select('*'),
       supabase
@@ -51,10 +59,22 @@ export default function AnalyticsPage() {
         .order('created_at', { ascending: false })
         .limit(2000),
       supabase.from('profiles').select('*'),
+      supabase
+        .from('charging_sessions')
+        .select(
+          'id, charger_id, user_id, reservation_id, ocpp_transaction_id, meter_start_kwh, meter_stop_kwh, cost_nu, status, started_at, ended_at',
+        )
+        .order('started_at', { ascending: false })
+        .limit(2000),
     ]);
-    if (st.error || ch.error || res.error || prof.error) {
+    if (st.error || ch.error || res.error || prof.error || ses.error) {
       setDataError(
-        st.error?.message ?? ch.error?.message ?? res.error?.message ?? prof.error?.message ?? 'Unknown error',
+        st.error?.message ??
+          ch.error?.message ??
+          res.error?.message ??
+          prof.error?.message ??
+          ses.error?.message ??
+          'Unknown error',
       );
     } else {
       setDataError(null);
@@ -62,6 +82,7 @@ export default function AnalyticsPage() {
       setChargers(ch.data as Charger[]);
       setReservations(res.data as Reservation[]);
       setProfiles(prof.data as Profile[]);
+      setSessions(ses.data as ChargingSession[]);
     }
     setLoading(false);
   }, []);
@@ -133,8 +154,59 @@ export default function AnalyticsPage() {
       .map(([label, value]) => ({ label, value }))
       .sort((a, b) => b.value - a.value);
 
-    return { chargerStatus, byDay, byHour, peakHour, topStations, byWeek, districts };
-  }, [stations, chargers, reservations, profiles, nowMs]);
+    // ---- OCPP charging sessions (energy + revenue) ----
+    const finished = sessions.filter(
+      (s) => s.status !== 'started' && s.meter_start_kwh !== null && s.meter_stop_kwh !== null,
+    );
+    const kwhDelivered = finished.reduce(
+      (sum, s) => sum + Math.max(0, Number(s.meter_stop_kwh) - Number(s.meter_start_kwh)),
+      0,
+    );
+    const revenueNu = sessions.reduce((sum, s) => sum + Number(s.cost_nu ?? 0), 0);
+    const avgKwhPerSession =
+      finished.length > 0 ? Math.round((kwhDelivered / finished.length) * 100) / 100 : 0;
+
+    // energy delivered per day (by started_at), last 14 days
+    const energyByDay: { label: string; value: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const day = new Date(now - i * DAY);
+      const key = day.toDateString();
+      energyByDay.push({
+        label: DAY_LABEL(day),
+        value:
+          Math.round(
+            finished
+              .filter((s) => new Date(s.started_at).toDateString() === key)
+              .reduce(
+                (sum, s) => sum + Math.max(0, Number(s.meter_stop_kwh) - Number(s.meter_start_kwh)),
+                0,
+              ) * 100,
+          ) / 100,
+      });
+    }
+
+    // busiest chargers by delivered energy
+    const labelOfCharger = new Map(chargers.map((c) => [c.id, `${c.label} · ${c.connector_type.toUpperCase()}`]));
+    const perChargerKwh = new Map<string, number>();
+    for (const s of finished) {
+      perChargerKwh.set(s.charger_id, (perChargerKwh.get(s.charger_id) ?? 0) + Math.max(0, Number(s.meter_stop_kwh) - Number(s.meter_start_kwh)));
+    }
+    const topChargersByKwh = [...perChargerKwh.entries()]
+      .map(([cid, kwh]) => ({ label: labelOfCharger.get(cid) ?? 'Removed charger', value: Math.round(kwh * 100) / 100 }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+
+    return {
+      chargerStatus, byDay, byHour, peakHour, topStations, byWeek, districts,
+      kwhDelivered: Math.round(kwhDelivered * 100) / 100,
+      revenueNu: Math.round(revenueNu * 100) / 100,
+      avgKwhPerSession,
+      sessionsCount: sessions.length,
+      activeSessions: sessions.filter((s) => s.status === 'started').length,
+      energyByDay, topChargersByKwh,
+      ocppChargers: chargers.filter((c) => c.status_source === 'ocpp').length,
+    };
+  }, [stations, chargers, reservations, profiles, sessions, nowMs]);
 
   const reservationCounts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -189,6 +261,33 @@ export default function AnalyticsPage() {
         </div>
       </section>
 
+      {/* OCPP energy & revenue — filled by the gateway's charging_sessions */}
+      <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <p className="text-2xl font-bold">{stats.kwhDelivered}</p>
+          <p className="text-xs text-neutral-400">kWh delivered</p>
+        </div>
+        <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <p className="text-2xl font-bold">{stats.revenueNu}</p>
+          <p className="text-xs text-neutral-400">Nu collected from sessions</p>
+        </div>
+        <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <p className="text-2xl font-bold">
+            {stats.sessionsCount}
+            {stats.activeSessions > 0 && (
+              <span className="ml-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-400">
+                {stats.activeSessions} live
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-neutral-400">charging sessions (avg {stats.avgKwhPerSession} kWh)</p>
+        </div>
+        <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <p className="text-2xl font-bold">{stats.ocppChargers}</p>
+          <p className="text-xs text-neutral-400">OCPP-managed chargers</p>
+        </div>
+      </section>
+
       <section className="mb-6 grid gap-4 lg:grid-cols-2">
         <Panel title="Bookings per day (last 14 days)">
           <BarChart data={stats.byDay} />
@@ -222,6 +321,20 @@ export default function AnalyticsPage() {
         <Panel title="Stations per district">
           <HBars data={stats.districts} barColor="bg-emerald-600" />
         </Panel>
+        <Panel title="Energy delivered per day (last 14 days)">
+          {stats.energyByDay.every((d) => d.value === 0) ? (
+            <Empty text="No energy delivered yet — connect chargers via the OCPP gateway." />
+          ) : (
+            <BarChart data={stats.energyByDay} barColor="bg-amber-500" />
+          )}
+        </Panel>
+        <Panel title="Busiest chargers (by kWh delivered)">
+          {stats.topChargersByKwh.length === 0 ? (
+            <Empty text="No completed charging sessions yet." />
+          ) : (
+            <HBars data={stats.topChargersByKwh} barColor="bg-amber-600" />
+          )}
+        </Panel>
       </section>
 
       <section className="mb-6 flex flex-wrap gap-3 text-xs">
@@ -236,9 +349,10 @@ export default function AnalyticsPage() {
       </section>
 
       <p className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/50 p-4 text-xs text-neutral-500">
-        Energy analytics (kWh delivered, cost per session) arrive in Phase 2 — the OCPP gateway will
-        write real transactions into <code>charging_sessions</code>, and this dashboard picks them up
-        with zero schema changes.
+        Energy figures come from <code>charging_sessions</code>, written live by the OCPP gateway
+        (OCPP 1.6 → Supabase). Chargers with a charge point id stream real status; the gateway
+        converts meter readings from Wh to kWh and prices sessions with each station&apos;s tariff
+        (<code>tariff_nu_per_kwh</code>, default 5 Nu/kWh).
       </p>
     </div>
   );

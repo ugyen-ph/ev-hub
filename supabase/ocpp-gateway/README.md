@@ -8,9 +8,13 @@ OCPP 1.6 gateway that connects EV chargers to your Supabase database.
 Real Charger → OCPP Gateway → Supabase → Your App
 ```
 
-- Accepts WebSocket connections from OCPP chargers
+- Accepts WebSocket connections from OCPP chargers (OCPP 1.6J Basic auth, optional wss://)
 - Translates OCPP messages to database records
 - Writes charger status, sessions, and meter values to Supabase
+- Converts OCPP **Wh** meter readings to **kWh** before writing
+- Tracks status **per connector** and aggregates dual-connector charge points
+- Marks chargers **offline** when heartbeats go stale (watchdog)
+- Maps charger `idTag`s to app users and **auto-checks-in reservations**
 - Your mobile app and admin dashboard show live data automatically
 
 ## Quick Start
@@ -22,7 +26,11 @@ cd supabase/ocpp-gateway
 npm install
 ```
 
-### 2. Configure
+### 2. Apply migration 0007
+
+In **Supabase Dashboard → SQL Editor**, run `supabase/migrations/20260902000007_ocpp_gateway_hardening.sql` — the gateway needs its new columns.
+
+### 3. Configure
 
 ```bash
 # Copy example config
@@ -33,7 +41,17 @@ cp .env.example .env
 # - SUPABASE_SERVICE_KEY (service_role key, not anon key)
 ```
 
-### 3. Add a Test Charger to Database
+Security options in `.env`:
+
+| Setting | Meaning |
+|---|---|
+| `CHARGERS=id:password,…` | OCPP 1.6J security profile 1 — chargers authenticate with HTTP Basic auth on the WebSocket upgrade (username = charge point id) |
+| `DEMO_MODE=false` | Enforces the Basic auth check (demo mode accepts any charger) |
+| `TLS_KEY_PATH` + `TLS_CERT_PATH` | Serve `wss://` directly from the gateway; alternatively terminate TLS on a reverse proxy |
+| `OFFLINE_AFTER_MINUTES` | Heartbeat silence before a charger is marked `offline` (default 10) |
+| `TARIFF_FALLBACK_NU` | Price per kWh when a station has no tariff (default 5) |
+
+### 4. Add a Test Charger to Database
 
 In your **Admin Dashboard**:
 1. Go to Stations → Edit a station
@@ -41,7 +59,7 @@ In your **Admin Dashboard**:
 3. Set **Charge Point ID (OCPP)** to: `TEST-CP-001`
 4. Save
 
-### 4. Start the Gateway
+### 5. Start the Gateway
 
 ```bash
 npm start
@@ -60,7 +78,7 @@ You should see:
 Gateway ready. Waiting for charger connections...
 ```
 
-### 5. Run the Fake Charger Test
+### 6. Run the Fake Charger Test
 
 In a **new terminal**:
 
@@ -72,10 +90,11 @@ This simulates a real charger:
 - Connects to the gateway
 - Sends status updates (Available → Occupied → Available)
 - Starts a charging session
-- Sends meter readings (50 → 75.5 kWh)
+- Sends meter readings in **Wh** (50,000 → 75,500 Wh = 50 → 75.5 kWh) — exactly
+  how real OCPP 1.6 chargers report, so the test proves the Wh → kWh conversion
 - Stops the session
 
-### 6. Verify Results
+### 7. Verify Results
 
 | Where | What to See |
 |-------|-------------|
@@ -98,7 +117,8 @@ This simulates a real charger:
 
 ## Status Mapping
 
-OCPP statuses are mapped to your database:
+OCPP statuses are mapped to your database (per connector, then aggregated —
+any faulted connector wins, then occupied, then reserved):
 
 | OCPP Status | Database Status |
 |-------------|-----------------|

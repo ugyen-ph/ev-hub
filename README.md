@@ -8,7 +8,7 @@ Find, reserve and navigate to EV charging stations across Bhutan — with a live
 
 | Folder | Product | Stack |
 |---|---|---|
-| `mobile/` | Driver app: map, live charger status, reservations, navigation | React Native · Expo SDK 54 · TypeScript |
+| `mobile/` | Driver app: map, live charger status, reservations, navigation | React Native · Expo SDK 57 · TypeScript |
 | `admin/` | Operator dashboard: live monitor, station & charger management, analytics | Next.js · Tailwind CSS · TypeScript |
 | `supabase/` | Shared backend: schema migrations & seed data | PostgreSQL · PostGIS · Auth · Realtime |
 
@@ -58,15 +58,21 @@ npm run dev                   # http://localhost:3000 — sign in with an operat
 - [x] **Session 4** — Map, nearest stations, live status via Realtime
 - [x] **Session 5** — Reservations with database-level double-booking protection
 - [x] **Session 6** — Admin dashboard: Stations · Users (live signups) · Reservations · Analytics
+- [x] **Phase 2a** — OCPP 1.6 gateway: real charger status, transactions in Wh→kWh, Basic auth, offline watchdog, reservation check-in, energy analytics
 - [ ] **Session 7** — OSRM routing, demo-mode fallback, showcase polish
 
-## Demo data & the BPC integration path
+## OCPP integration — how real chargers connect
 
-Charger statuses are **demo (seed) data** today. The schema is built for the real thing:
+The gateway (`supabase/ocpp-gateway/`) is live and speaks **OCPP 1.6** over WebSocket:
 
-- `status_source` (`seed` | `manual` | `ocpp`) tracks where status truth comes from — OCPP always wins
-- `charging_sessions` mirrors OCPP's transaction model (meter start/stop kWh)
-- Phase 2 adds a small Node.js **OCPP gateway** that writes into the same tables — zero changes to the app or dashboard when BPC chargers connect
+- **Status** — `StatusNotification` is tracked **per connector** and aggregated into the charger row (`connector_statuses`), so a dual-connector charge point reports truthfully
+- **Units** — OCPP meters report **Wh**; the gateway converts to kWh before writing `meter_*_kwh`
+- **Sessions** — `StartTransaction`/`MeterValues`/`StopTransaction` fill `charging_sessions`; cost = (stop − start) × `stations.tariff_nu_per_kwh` (default 5 Nu/kWh); transaction ids are unique and DB-generated
+- **Drivers** — every profile gets an `id_tag` (shown on the mobile Profile screen); the gateway maps `StartTransaction.idTag` → user and **auto-checks-in a matching reservation** (confirmed → active, completed on stop)
+- **Security** — OCPP 1.6J security profile 1: HTTP Basic auth on the WebSocket upgrade (`CHARGERS=id:password`, enforced when `DEMO_MODE=false`); serve `wss://` via the built-in TLS options or a reverse proxy
+- **Reliability** — a watchdog marks OCPP chargers `offline` after 10 min without a heartbeat; `StopTransaction.reason` faults mark sessions `errored`
+
+Charger statuses are **demo (seed) data** until a charger connects — then `status_source` flips to `ocpp` and hardware truth wins (the dashboard locks manual edits for those rows).
 
 ## Security
 
@@ -88,6 +94,7 @@ Charger statuses are **demo (seed) data** today. The schema is built for the rea
    6. `supabase/migrations/20260902000004_stations_map_view.sql` (map pins for the mobile Map tab)
    7. `supabase/migrations/20260902000005_demo_status_flip.sql` (optional, demo-only — status flips without a secret key; no longer used by the dashboard)
    8. `supabase/migrations/20260902000006_admin_realtime_and_hardening.sql` (required for the admin dashboard — realtime for profiles/stations + security hardening; includes the first-operator bootstrap snippet)
+  9. `supabase/migrations/20260902000007_ocpp_gateway_hardening.sql` (required before running the OCPP gateway — unique transaction ids, heartbeats, per-connector state, station tariffs, driver idTags)
 3. Fully restart Expo (stop + `npx expo start`) — Expo caches env vars at startup
 4. Open the **Stations** tab on your phone: 12 demo stations, live from your database
 

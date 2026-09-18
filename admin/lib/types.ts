@@ -1,4 +1,4 @@
-// Row types mirroring the Supabase schema (supabase/migrations 0001–0005).
+// Row types mirroring the Supabase schema (supabase/migrations 0001–0007).
 // PostgREST returns numeric columns (power_kw, cost_nu, …) as strings.
 
 export type ChargerStatus = 'available' | 'reserved' | 'busy' | 'faulted' | 'offline';
@@ -15,6 +15,8 @@ export type Station = {
   address: string | null;
   amenities: string[];
   is_active: boolean;
+  /** NU per kWh (migration 0007) — used by the OCPP gateway to price sessions. */
+  tariff_nu_per_kwh: string;
   /** geography(point,4326) — PostgREST returns it as WKT text: 'POINT(lng lat)'. */
   location: unknown;
   created_at: string;
@@ -31,6 +33,10 @@ export type Charger = {
   status_source: StatusSource;
   charge_point_id: string | null;
   last_status_change: string;
+  /** migration 0007 — refreshed by charger boot/heartbeat, powers offline detection. */
+  last_heartbeat: string;
+  /** migration 0007 — { "1": "Available", "2": "Occupied" }, kept by the gateway. */
+  connector_statuses: Record<string, string>;
   created_at: string;
   updated_at: string;
 };
@@ -40,6 +46,8 @@ export type Profile = {
   full_name: string;
   phone: string | null;
   ev_model: string | null;
+  /** migration 0007 — the driver's OCPP identity (charge point keypad / RFID tag). */
+  id_tag: string | null;
   role: UserRole;
   created_at: string;
   updated_at: string;
@@ -55,6 +63,24 @@ export type Reservation = {
   grace_minutes: number;
   created_at: string;
   updated_at: string;
+};
+
+export type SessionStatus = 'started' | 'completed' | 'errored';
+
+// Written by the OCPP gateway (service key) — meters are kWh after the
+// gateway's Wh → kWh conversion.
+export type ChargingSession = {
+  id: string;
+  charger_id: string;
+  user_id: string | null;
+  reservation_id: string | null;
+  ocpp_transaction_id: number | null;
+  meter_start_kwh: string | null;
+  meter_stop_kwh: string | null;
+  cost_nu: string | null;
+  status: SessionStatus;
+  started_at: string;
+  ended_at: string | null;
 };
 
 // ---- PostgREST embeds used by the dashboards ----
